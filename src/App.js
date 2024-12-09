@@ -2,14 +2,19 @@ import React, { useEffect, useState } from 'react';
 import { createHashRouter, RouterProvider } from 'react-router-dom'; 
 import Login from './components/Login';
 import RootLayout from './pages/Root';
-import CategoriesAndSubPage from './pages/CategoriesAndSubPage';
-import Home from './pages/Home';
-import AddProduct from './components/AddProduct';
-import Transfer from './components/Transfer';
-import ProductList from './components/ProductList';
+import Cart from './components/Cart'
+import ProductTable from './components/ProductsTable'
+import SoftDrinksTable from './components/SoftDrinksTable'
+import DownloadProducts from './components/DownloadProducts'
+import UpdatePrice from './components/UpdatePrice'
 import Sales from './components/Sales';
-import CigaretteList from './components/CigaretteList'
-import BackupProducts from './components/BackupProducts';
+import AddCategoryAndSubcategory from './components/AddCategoryAndSubcategory'
+import AddProduct from './components/AddProduct'
+import AdminDashboard from './pages/AdminDashboard';
+import AddProdCate from './pages/AddProdCate';
+import SalesReport from './pages/SalesReport';
+import ProductList from './pages/ProductList';
+
 
 
 
@@ -31,13 +36,12 @@ const App = () => {
       path: '/',
       element: <RootLayout />,
       children: [
-        { path: '/', element: <ProductList /> },
-        { path: '/addcategories', element: <CategoriesAndSubPage /> },
-        { path: '/addproduct', element: <AddProduct /> },
-        { path: '/transfer', element: <Transfer /> },
-        { path: '/sales', element: <Sales /> },
-        {path: '/cigarettelist', element: <CigaretteList/>},
-        {path: '/backup', element: <BackupProducts/>}
+        { path: '/', element:<SalesReport/>  },
+        {path: '/addproduct', element:<AddProdCate/> },
+
+        { path: '/backup', element: <DownloadProducts/>},
+        {path: '/productlist', element: <ProductList/>}
+      
       ],
     },
   ]);
@@ -45,7 +49,7 @@ const App = () => {
   const staffRouter = createHashRouter([
     {
       path: '/',
-      element: <Home />,
+      element: <Cart/>,
     },
   ]);
 
@@ -60,6 +64,16 @@ const App = () => {
       ) : (
         <RouterProvider router={userRole === 'admin' ? adminRouter : staffRouter} />
       )}
+
+        {/* <Cart/>
+        <ProductTable/>
+        <SoftDrinksTable/>
+        <DownloadProducts/>
+        <UpdatePrice/>
+        <Sales/>
+        <AddCategoryAndSubcategory/>
+        <AddProduct/> */}
+
     </>
   );
 };

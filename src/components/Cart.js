@@ -1,319 +1,417 @@
-import React, { useState, useRef } from 'react';
-import { getDocs, query, where, collection, addDoc, doc, runTransaction } from "firebase/firestore";
-import db from '../firebase'; // Adjust import path to your Firebase configuration
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTrash } from '@fortawesome/free-solid-svg-icons';
-import useFocus from './useFocus'; // Adjust import path to your useFocus hook
+import { useState, useEffect } from 'react';
+import { collection, getDocs, getDoc, orderBy,query, where, doc, updateDoc, addDoc } from 'firebase/firestore';
+import db from '../firebase';
 
-const Cart = ({ cartItems, setCartItems }) => {
-  const [itemCode, setItemCode] = useState('');
-  const [quantity, setQuantity] = useState(1);
-  const [cash, setCash] = useState(0);
-  const itemCodeRef = useRef(null); // Reference to the item code input field
+import bg from '../assets/back2.png'
 
-  // Use custom hook to focus on item code input field
-  useFocus(itemCodeRef, [cartItems, itemCode, quantity, cash]);
+const Cart = () => {
+  const [softDrinks, setSoftDrinks] = useState([]);
+  const [cart, setCart] = useState([]);
+  const [view, setView] = useState('perPcs');
 
-  // Function to add items to the cart
-  const addToCart = async (code, qty) => {
-    const itemDetails = await getItemDetailsByCode(code);
-    const existingItem = cartItems.find(item => item.code === code && item.name === itemDetails.name);
-  
-    const newItem = {
-      id: Date.now(), // Use timestamp or UUID for a unique ID
-      code,
-      name: itemDetails.name,
-      quantity: qty,
-      price: itemDetails.price * qty
-    };
-  
-    if (existingItem) {
-      setCartItems(cartItems.map(item =>
-        item.code === code && item.name === itemDetails.name
-          ? {
-              ...item,
-              quantity: item.quantity + Number(qty), // Ensure qty is treated as a number
-              price: (item.quantity + Number(qty)) * itemDetails.price // Update price accordingly
-            }
-          : item
-      ));
-    } else {
-      setCartItems([...cartItems, newItem]);
-    }
-  
-    setItemCode('');
-    setQuantity(1);
-  };
 
-  // Fetch item details based on barcode
-  const getItemDetailsByCode = async (code) => {
+
+  // Fetch Soft Drinks from Firestore
+  const fetchSoftDrinks = async () => {
     try {
-      const itemsRef = collection(db, "products");
-      const q = query(itemsRef, where("barcode", "==", code));
-      const querySnapshot = await getDocs(q);
+      const softDrinksQuery = query(
+        collection(db, 'products'),
+        where('category', '==', 'Beverages'),
+        where('subcategory', 'in', ['Soft drinks', 'Water']),
 
-      if (!querySnapshot.empty) {
-        const itemData = querySnapshot.docs[0].data();
+  orderBy('category', 'asc'),
+  orderBy('purchaseCount', 'desc')
+      
+      );
+      const querySnapshot = await getDocs(softDrinksQuery);
+      const softDrinksList = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        console.log('Product Data:', data); // Debugging data from Firestore
         return {
-          name: itemData.name,
-          price: itemData.sellingPrice
+          id: doc.id,
+          ...data,
         };
-      } else {
-        return { name: 'Unknown Item', price: 0 };
-      }
-    } catch (error) {
-      console.error("Error fetching item details:", error);
-      return { name: 'Error', price: 0 };
-    }
-  };
-
- // Handle when 'Enter' is pressed (useful for most scanners)
-const handleScan = (e) => {
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    addToCart(itemCode, quantity); // Automatically add to cart on 'Enter' key
-  }
-};
-
-// Handle input change (useful for mobile or cases where no 'Enter' key is sent)
-const expectedBarcodeLength = 13;
-const handleInputChange = (e) => {
-  const newCode = e.target.value;
-  setItemCode(newCode);
-
-  // Optionally detect if a scan has completed based on input pattern or length
-  if (newCode.length === expectedBarcodeLength) {
-    addToCart(newCode, quantity); // Automatically add to cart when full scan is detected
-  }
-};
-  
-
-  // Handle click on "Add to Cart" button
-  const handleAddToCartClick = () => {
-    addToCart(itemCode, quantity);
-  };
-
-  // Increase item quantity
-  const increaseQuantity = (id) => {
-    setCartItems(prevItems =>
-      prevItems.map(item =>
-        item.id === id
-          ? {
-              ...item,
-              quantity: item.quantity + 1,
-              price: (item.price / item.quantity) * (item.quantity + 1) // Calculate new price
-            }
-          : item
-      )
-    );
-  };
-
-  // Decrease item quantity
-  const decreaseQuantity = (id) => {
-    setCartItems(prevItems =>
-      prevItems.map(item =>
-        item.id === id
-          ? {
-              ...item,
-              quantity: item.quantity > 1 ? item.quantity - 1 : 1, // Prevent quantity from going below 1
-              price: (item.price / item.quantity) * (item.quantity - 1) // Calculate new price
-            }
-          : item
-      )
-    );
-  };
-
-  // Remove item from cart
-  const removeItemFromCart = (id, name) => {
-    setCartItems(prevItems => prevItems.filter(item => !(item.id === id && item.name === name)));
-  };
-
-  // Handle denomination button click
-  const handleDenominationClick = (value) => {
-    setCash(prevCash => prevCash + value);
-  };
-
-  // Handle cash input change
-  const handleCashChange = (e) => {
-    const value = parseInt(e.target.value);
-    if (!isNaN(value)) {
-      setCash(value);
-    }
-  };
-
-  // Calculate total and change
-  const total = cartItems.reduce((sum, item) => sum + item.price, 0);
-  const change = cash - total;
-
-  // Submit
-  const handleSubmit = async () => {
-    try {
-      // Record the sale
-      const saleRef = collection(db, "sales");
-      const saleData = {
-        items: cartItems,
-        totalAmount: total,
-        cashReceived: cash,
-        change: change,
-        timestamp: new Date(),
-      };
-      await addDoc(saleRef, saleData);
-  
-      // Prepare data for transaction
-      const productUpdates = {};
-      const itemsRef = collection(db, "products");
-  
-      // Fetch all necessary data before starting the transaction
-      for (const item of cartItems) {
-        let productQuery;
-        if (item.code) {
-          // Handle barcode items
-          productQuery = query(itemsRef, where("barcode", "==", item.code));
-        } else {
-          // Handle no-barcode items
-          productQuery = query(itemsRef, where("name", "==", item.name));
-        }
-  
-        const querySnapshot = await getDocs(productQuery);
-  
-        if (querySnapshot.empty) {
-          console.error(`Item not found: ${item.code || item.name}`);
-          continue;
-        }
-  
-        const productDoc = querySnapshot.docs[0];
-        const productRef = productDoc.ref;
-        const productData = productDoc.data();
-        const newQuantity = productData.quantity - item.quantity;
-  
-        if (newQuantity < 0) {
-          console.error(`Not enough stock for item. Current stock: ${productData.quantity}, Requested: ${item.quantity}`);
-          continue;
-        }
-  
-        productUpdates[productRef.id] = newQuantity;
-      }
-  
-      // Perform the transaction to update inventory
-      await runTransaction(db, async (transaction) => {
-        for (const [productId, newQuantity] of Object.entries(productUpdates)) {
-          const productRef = doc(db, "products", productId);
-          transaction.update(productRef, { quantity: newQuantity });
-        }
       });
-  
-      console.log("Sale recorded and inventory updated successfully");
-  
-      // Clear cart and reset cash
-      setCartItems([]);
-      setCash(0);
+      console.log(softDrinksList);
+      setSoftDrinks(softDrinksList);
     } catch (error) {
-      console.error("Error recording sale and updating inventory:", error);
+      console.error('Error fetching soft drinks:', error);
     }
   };
+
+
+  useEffect(() => {
+    fetchSoftDrinks();
+  }, []);
+
+  // Toggle view
+  const toggleView = (viewType) => {
+    setView(viewType);
+  };
+
+
+
+
+  const addToCart = (product) => {
+    console.log('Product:', product); // Check the product being added
+    let priceToAdd = 0;
+    let quantityToAdd = 1;
+    let combinedName = product.name; // Default name
+    let isBundle = false;
+
+    if (view === 'perPcs') {
+      priceToAdd = parseFloat(product.pricing?.pricePerUnit) || 0;
+      console.log('Price per unit (perPcs):', priceToAdd); // Debugging price per unit
+    } else if (view === 'perBundle') {
+      isBundle = true;
+      const bulkPricing = product.pricing?.bulkPricing[0]; // Get bulk pricing details
+      if (bulkPricing) {
+        const bulkPricePerUnit = parseFloat(bulkPricing.bulkPricePerUnit) || 0; // Price per unit for bulk
+        const quantityInBundle = parseInt(bulkPricing.quantity, 10) || 1; // Quantity in the bundle
+
+        priceToAdd = bulkPricePerUnit; // Set price per unit for bulk
+        quantityToAdd = quantityInBundle; // Set quantity to the number of items in the bundle
+
+        combinedName = `${product.name} (Bundle of ${quantityInBundle})`; // Display the bundle details
+
+        console.log('Bulk Price Per Unit:', priceToAdd); // Debugging bulk price per unit
+        console.log('Quantity in Bundle:', quantityToAdd); // Debugging bundle quantity
+      }
+    } else if (view === 'customBundle') {
+      isBundle = true;
+      const bulkPricing = product.pricing?.bulkPricing[0]; // Get bulk pricing details
+      if (bulkPricing) {
+        const bulkPricePerUnit = parseFloat(bulkPricing.bulkPricePerUnit) || 0; // Price per unit for bulk
+
+        priceToAdd = bulkPricePerUnit; // Set price per unit for bulk
+        quantityToAdd = 1; // Always add 1 quantity to the cart
+
+        combinedName = `${product.name} (Custom Bundle)`; // Display the custom bundle details
+
+        console.log('Custom Bundle Price Per Unit:', priceToAdd); // Debugging custom bundle price per unit
+      }
+    }
+
+    if (quantityToAdd <= 0 || isNaN(priceToAdd)) {
+      alert('Please enter valid pricing and quantity.');
+      return;
+    }
+
+    const totalPriceToAdd = priceToAdd * quantityToAdd; // Calculate the total price based on bulk price and quantity
+    console.log('Total Price to Add:', totalPriceToAdd); // Debugging total price
+
+    setCart((prevCart) => {
+      const existingProduct = prevCart.find((item) => item.id === product.id && item.isBundle === isBundle);
+      console.log('Existing Product:', existingProduct); // Debugging existing product search
+
+      if (existingProduct) {
+        return prevCart.map((item) =>
+          item.id === product.id && item.isBundle === isBundle
+            ? {
+              ...item,
+              quantity: item.quantity + quantityToAdd, // Increment quantity
+              totalPrice: item.totalPrice + totalPriceToAdd, // Update total price
+            }
+            : item
+        );
+      } else {
+        return [
+          ...prevCart,
+          {
+            ...product,
+            isBundle,
+            combinedName,
+            price: priceToAdd, // Store bulk price per unit
+            quantity: quantityToAdd, // Store total quantity
+            totalPrice: totalPriceToAdd, // Store the total price
+          },
+        ];
+      }
+    });
+  };
+
+
+
+
+  const updateQuantity = (productId, type) => {
+    setCart(cart.map(item =>
+      item.id === productId
+        ? {
+            ...item,
+            quantity: type === 'increase' ? item.quantity + 1 : Math.max(item.quantity - 1, 1),
+            totalPrice: (type === 'increase'
+              ? item.totalPrice + item.price
+              : Math.max(item.totalPrice - item.price, item.price)), // Recalculate totalPrice
+          }
+        : item
+    ));
+  };
+
+  // Remove Item from Cart
+  const removeItem = (productId) => {
+    setCart(cart.filter(item => item.id !== productId));
+  };
+
+  // Proceed to Checkout
+  const proceedToCheckout = async () => {
+    try {
+      // Fix totalPrice calculation: Sum up item totalPrice directly
+      const totalPrice = cart.reduce((total, item) => {
+        return total + (parseFloat(item?.totalPrice) || 0);  // Just sum totalPrice
+      }, 0);
+  
+      const saleData = {
+        products: cart.map(item => ({
+          productId: item.id || 'N/A',
+          name: item.combinedName || item.name || 'Unnamed Product',
+          price: item.price || 0,
+          quantity: item.quantity || 1,
+        })),
+        totalPrice: totalPrice,
+        date: new Date(),
+        status: 'pending',
+      };
+  
+      const salesRef = collection(db, 'sales');
+      await addDoc(salesRef, saleData);
+  
+      // Update purchaseCount and stockInUnits for each item
+      for (const item of cart) {
+        const productRef = doc(db, 'products', item.id);
+  
+        // Get the current product data
+        const productSnapshot = await getDoc(productRef);
+        const productData = productSnapshot.data();
+        
+        // Get the current purchaseCount and stockInUnits
+        const currentPurchaseCount = productData?.purchaseCount || 0;
+        const stockInUnits = parseFloat(productData?.stockInUnits) || 0;
+        
+        // Calculate the new purchaseCount (add quantity purchased)
+        const newPurchaseCount = currentPurchaseCount + (parseInt(item.quantity) || 0);
+  
+        // Decrease stock based on the quantity purchased
+        await updateDoc(productRef, {
+          stockInUnits: stockInUnits - (parseInt(item.quantity) || 0),
+          purchaseCount: newPurchaseCount,
+        });
+      }
+  
+      setCart([]);
+    
+    } catch (error) {
+      console.error('Error proceeding to checkout:', error);
+      alert('There was an error during checkout.');
+    }
+  };
+  
+
 
   return (
-    <div className='bg-gradient-to-r from-[#623288] to-[#4B0082] flex flex-col justify-between h-screen w-full sm:h-auto sm:w-2/5 p-4'>
-      <div>
-        <div className="mb-2">
-          <label className="block text-white mb-2">Item Code:</label>
-          <input
-           type="text"
-           value={itemCode}
-           onChange={handleInputChange} // Handle input change for both tablet and computer
-           onKeyDown={handleScan} // Handle 'Enter' key for computer and tablet
-           className="border border-gray-400 rounded-md p-1 w-full"
-            ref={itemCodeRef} // Attach ref here
-          />
-        </div>
-        <div className="mb-2">
-          <label className="block text-white mb-1">Quantity:</label>
-          <input
-            type="number"
-            value={quantity}
-            onChange={(e) => setQuantity(parseInt(e.target.value))}
-            className="border border-gray-400 rounded-md px-4 py-2 w-full"
-            min="1"
-          />
-        </div>
-        <button
-          id="add-to-cart-button"
-          onClick={handleAddToCartClick}
-          className="bg-white text-[#623288] font-bold py-2 px-4 rounded w-full"
-        >
-          Add to Cart
-        </button>
+    <div className='bg-gray-200 h-screen '>
 
-        <div className="mt-8 text-white bg-[#1d1d1d] p-2 rounded h-auto">
-          <h2 className="text-xl font-bold">Cart Items</h2>
-          <ul className="mt-4">
-            {cartItems.map((item) => (
-              <li key={item.id} className="flex flex-col sm:flex-row justify-between items-center mb-2">
-                <div className="flex items-center">
-                  <button
-                    onClick={() => decreaseQuantity(item.id)}
-                    className={`bg-[#623288] font-bold text-gray-200 px-1 rounded-l ${item.noBarcode ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    disabled={item.noBarcode}
-                  >
-                    -
-                  </button>
-                  <span className="px-2">{item.quantity}</span>
-                  <button
-                    onClick={() => increaseQuantity(item.id)}
-                    className={`bg-[#623288] font-bold text-gray-200 px-1 rounded-r ${item.noBarcode ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    disabled={item.noBarcode}
-                  >
-                    +
-                  </button>
-                </div>
-                <span className="flex-grow px-2 text-xs text-center sm:text-left">{item.name}</span>
-                <span className="px-2">₱{item.price.toFixed(2)}</span>
-                <button
-                  onClick={() => removeItemFromCart(item.id, item.name)}
-                  className="text-red-500"
-                >
-                  <FontAwesomeIcon icon={faTrash} />
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
 
-      <div className='bg-[#1d1d1d]  p-2 rounded-md mt-4'>
-        <div className="text-white">
-          <h2 className="text-xl font-bold">Total: ₱{total.toFixed(2)}</h2>
-          <div className='flex flex-col sm:flex-row items-center justify-between mt-2'>
-            <h2 className="text-xl font-bold">Cash Given: ₱{cash}</h2>
+
+      <div className="flex ">
+
+      <div className="w-1/3 h-screen bg-gradient-to-r from-[#623288] to-[#4B0082] p-4">
+  <h2 className="text-xl font-semibold text-white mb-4">Your Cart</h2>
+  {cart.length === 0 ? (
+    <p className="text-white">Your cart is empty.</p>
+  ) : (
+    <div className="bg-white p-4 rounded-md shadow-md">
+      {cart.map((item, index) => (
+        <div key={item.combinedName + index} className="flex items-center justify-between mb-4">
+          <div className="flex items-center">
+            <img
+              src={item.imageUrl}
+              alt={item.name}
+              className="w-12 h-12 object-cover rounded-full"
+            />
+            <div className="ml-4">
+              <p className="text-lg font-semibold text-gray-800">{item.combinedName || item.name}</p>
+              <p className="text-gray-600">
+                ₱{!isNaN(item.totalPrice) ? item.totalPrice.toFixed(2) : '0.00'} total
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2">
             <button
-              onClick={() => setCash(0)}
-              className="bg-[#623288] text-white text-sm font-bold py-1 px-2 rounded mt-2 sm:mt-0"
+              onClick={() => updateQuantity(item.id, 'decrease')}
+              className="px-2 py-1 bg-gray-300 text-gray-800 rounded-full hover:bg-gray-400"
             >
-              Clear
+              -
+            </button>
+            <span>{item.quantity}</span>
+            <button
+              onClick={() => updateQuantity(item.id, 'increase')}
+              className="px-2 py-1 bg-gray-300 text-gray-800 rounded-full hover:bg-gray-400"
+            >
+              +
+            </button>
+            <button
+              onClick={() => removeItem(item.id)}
+              className="text-red-500 hover:text-red-700"
+            >
+              Remove
             </button>
           </div>
+        </div>
+      ))}
+      <div className="mt-4">
+      <p className="text-xl text-green-500 font-semibold">
+                  Total: ₱
+                  {cart.reduce((total, item) => {
+                    const itemTotalPrice = isNaN(item.totalPrice) ? 0 : item.totalPrice; // Use the total price directly
+                    return total + itemTotalPrice;
+                  }, 0).toFixed(2)}
+                </p>
 
-          <div className="flex flex-wrap mt-2 gap-2">
-            {[1000, 500, 200, 100, 50, 20].map(value => (
-              <button
-                key={value}
-                onClick={() => handleDenominationClick(value)}
-                className="bg-[#623288] text-gray-200 font-bold py-1 px-2 rounded"
-              >
-                ₱{value}
-              </button>
-            ))}
-          </div>
-          <h2 className="text-xl font-bold mt-2">Change: ₱{change.toFixed(2)}</h2>
+        <button
+          onClick={proceedToCheckout}
+          className="mt-4 w-full py-2 bg-[#623288] text-white rounded-md hover:bg-[#4B0082]"
+        >
+          Proceed to Checkout
+        </button>
+      </div>
+    </div>
+  )}
+</div>
+        
+      <div className="w-full p-2 h-auto" style={{ backgroundImage: `url(${bg})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
+  <div className="flex space-x-4 mb-6">
+    <button
+      onClick={() => toggleView('perPcs')}
+      className={`px-6 py-3 rounded-lg transition-all duration-300 ${view === 'perPcs' ? 'bg-[#623288] text-white shadow-lg' : 'bg-gray-700 text-white hover:bg-[#4B0082]'}`}
+    >
+      Per Pcs
+    </button>
+    <button
+      onClick={() => toggleView('perBundle')}
+      className={`px-6 py-3 rounded-lg transition-all duration-300 ${view === 'perBundle' ? 'bg-[#623288] text-white shadow-lg' : 'bg-gray-700 text-white hover:bg-[#4B0082]'}`}
+    >
+      Per Bundle/Case
+    </button>
+    <button
+      onClick={() => toggleView('customBundle')}
+      className={`px-6 py-3 rounded-lg transition-all duration-300 ${view === 'customBundle' ? 'bg-[#623288] text-white shadow-lg' : 'bg-gray-700 text-white hover:bg-[#4B0082]'}`}
+    >
+      Custom Case
+    </button>
+  </div>
+
+  {/* Display for perPcs and perBundle view */}
+  {(view === 'perPcs' || view === 'perBundle') && (
+  <div className="grid grid-cols-6 gap-2">
+    {softDrinks.map((product) => {
+      let priceText = '';
+
+      if (view === 'perPcs') {
+        priceText = `₱${product.pricing?.pricePerUnit} per ${product.unitType}`;
+      } else if (view === 'perBundle') {
+        const bulkPricing = product.pricing?.bulkPricing[0];
+        priceText = bulkPricing ? `₱${bulkPricing.bulkPricePerUnit} per ${bulkPricing.description}` : '';
+      }
+
+      return (
+        <div key={product.id} className="bg-[#1a1818] rounded-md p-4 text-center text-white">
+          <img
+            src={product.imageUrl}
+            alt={product.name}
+            className="w-32 h-32 object-cover mx-auto" // Adjusted size and style
+          />
+          <h3 className="mt-2 text-md font-semibold">{product.name}</h3>
+        
           <button
-            onClick={handleSubmit}
-            className={`bg-[#623288] text-white font-bold py-2 px-4 rounded w-full mt-4 ${cartItems.length === 0 ? ' cursor-not-allowed bg-gray-500' : ''}`}
-            disabled={cartItems.length === 0}
+            onClick={() => addToCart(product)}
+            className="mt-2 px-4 py-2 bg-[#623288] text-white text-xs rounded-md hover:bg-[#4B0082]"
           >
-            Submit
+            Add to Cart
           </button>
         </div>
+      );
+    })}
+  </div>
+)}
+
+
+  {/* Display for customBundle view */}
+  {view === 'customBundle' && (
+  <>
+    {/* Liter Grid (products with unitsPerCase === 12) */}
+    <div className="mb-4">
+      <h3 className="text-lg font-semibold text-white">Liter</h3>
+      <div className="grid grid-cols-4 gap-4">
+        {softDrinks
+          .filter((product) => product.unitType === 'Bottle' && product.unitsPerCase === 12)
+          .map((product) => {
+            let priceText = 'Custom Quantity';
+
+            return (
+              <div key={product.id} className="bg-[#1a1818] rounded-md p-4 text-center text-white">
+                <img
+                  src={product.imageUrl}
+                  alt={product.name}
+                  className="w-32 h-32 object-cover mx-auto" // Adjusted size and removed rounded-full
+                />
+                <h3 className="mt-2 text-md font-semibold">{product.name}</h3>
+                <button
+                  onClick={() => addToCart(product)}
+                  className="mt-2 px-4 py-2 bg-[#623288] text-white text-xs rounded-md hover:bg-[#4B0082]"
+                >
+                  Add to Cart
+                </button>
+              </div>
+            );
+          })}
       </div>
+    </div>
+
+    {/* Onz Grid (products with unitsPerCase === 24) */}
+    <div>
+      <h3 className="text-lg font-semibold text-white">Onz</h3>
+      <div className="grid grid-cols-4 gap-4">
+        {softDrinks
+          .filter((product) => product.unitType === 'Bottle' && product.unitsPerCase === 24)
+          .map((product) => {
+            let priceText = 'Custom Quantity';
+
+            return (
+              <div key={product.id} className="bg-[#1a1818] rounded-md p-4 text-center text-white">
+                <img
+                  src={product.imageUrl}
+                  alt={product.name}
+                  className="w-32 h-32 object-cover mx-auto" // Adjusted size and removed rounded-full
+                />
+                <h3 className="mt-2 text-md font-semibold">{product.name}</h3>
+                <button
+                  onClick={() => addToCart(product)}
+                  className="mt-2 px-4 py-2 bg-[#623288] text-white text-xs rounded-md hover:bg-[#4B0082]"
+                >
+                  Add to Cart
+                </button>
+              </div>
+            );
+          })}
+      </div>
+    </div>
+  </>
+)}
+
+</div>
+
+
+
+
+
+
+
+
+      </div>
+
+
+
+
     </div>
   );
 };

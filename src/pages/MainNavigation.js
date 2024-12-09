@@ -3,34 +3,24 @@ import { Link } from 'react-router-dom';
 
 const MainNavigation = () => {
   return (
-    <div className="bg-white min-h-screen w-64 flex flex-col">
-      <div className="flex justify-center items-center h-16 bg-blue-700 text-white text-xl font-bold">
-        Logo
-      </div>
-      <div className="flex-grow flex space-y-5 mt-5 flex-col">
-        <Link to="/" className="text-black text-lg  px-4  hover:bg-gray-200 transition duration-300 ease-in-out">
+    <div className="fixed top-16 left-0 bg-white w-64 h-full flex flex-col shadow-md">
+    
+      <nav className="flex-grow flex flex-col space-y-3 mt-5">
+        <Link to="/" className="text-black text-lg px-4 py-2 hover:bg-gray-200 transition duration-300">
           Home
         </Link>
-        <Link to="/addcategories"className="text-black text-lg px-4  hover:bg-gray-200 transition duration-300 ease-in-out">
-          Add Categories
-        </Link>
-        <Link to="/transfer" className="text-black text-lg px-4  hover:bg-gray-200 transition duration-300 ease-in-out">
-          Transfer Product
-        </Link>
-        <Link to="/addproduct" className="text-black text-lg  px-4  hover:bg-gray-200 transition duration-300 ease-in-out">
+    
+        <Link to="/addproduct" className="text-black text-lg px-4 py-2 hover:bg-gray-200 transition duration-300">
           Add Product
         </Link>
-        <Link to="/sales" className="text-black text-lg  px-4  hover:bg-gray-200 transition duration-300 ease-in-out">
-         Sales Report
+      
+        <Link to="/productlist" className="text-black text-lg px-4 py-2 hover:bg-gray-200 transition duration-300">
+          Product List
         </Link>
-        <Link to="/cigarettelist" className="text-black text-lg  px-4  hover:bg-gray-200 transition duration-300 ease-in-out">
-         Cigarette List
+        <Link to="/backup" className="text-black text-lg px-4 py-2 hover:bg-gray-200 transition duration-300">
+          Backup Product
         </Link>
-        <Link to="/backup" className="text-black text-lg  px-4  hover:bg-gray-200 transition duration-300 ease-in-out">
-        Backup Product
-        </Link>
-        {/* Add more links as needed */}
-      </div>
+      </nav>
     </div>
   );
 };

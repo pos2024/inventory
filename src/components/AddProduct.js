@@ -1,240 +1,320 @@
 import React, { useState, useEffect } from 'react';
-import db from "../firebase";
-import { addDoc, getDocs, collection } from "firebase/firestore";
+import db from '../firebase';
+import { collection, addDoc, writeBatch, Timestamp, getDocs, doc, getDoc } from 'firebase/firestore';
 
 const AddProduct = () => {
-  const [productName, setProductName] = useState('');
-  const [categoryID, setCategoryID] = useState('');
-  const [categoryChildID, setCategoryChildID] = useState('');
-  const [quantity, setQuantity] = useState('');
-  const [wholesalePrice, setWholesalePrice] = useState('');
-  const [sellingPrice, setSellingPrice] = useState('');
-  const [barcode, setBarcode] = useState('');
-  const [NoBarcodeItems, setNoBarcodeItems] = useState(false);
-  const [otherPrice, setOtherPrice] = useState('');
-  const [otherQuantity, setOtherQuantity] = useState('');
-  const [quantitiesButton, setQuantitiesButton] = useState('');
+  const [name, setName] = useState('');
+  const [category, setCategory] = useState('');
+  const [subcategory, setSubcategory] = useState('');
+  const [brand, setBrand] = useState('');
+  const [unitType, setUnitType] = useState('');
+  const [pricePerUnit, setPricePerUnit] = useState('');
+  const [bulkPricing, setBulkPricing] = useState([{ quantity: '', price: '', description: '' }]);
+  const [wholesalePricing, setWholesalePricing] = useState({ pricePerUnit: '' });
+  const [stock, setStock] = useState('');
+  const [unitsPerCase, setUnitsPerCase] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+  const [isSoldByPiece, setIsSoldByPiece] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [categories, setCategories] = useState([]);
-  const [categoryChildren, setCategoryChildren] = useState([]);
+  const [subcategories, setSubcategories] = useState([]);
 
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const categoriesRef = collection(db, "categories");
-        const categoriesSnapshot = await getDocs(categoriesRef);
-        const categoriesData = categoriesSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setCategories(categoriesData);
-      } catch (error) {
-        console.error("Error fetching categories: ", error);
-      }
-    };
-
-    fetchCategories();
-  }, []);
-
-  const handleCategoryChange = async (e) => {
-    const selectedCategoryID = e.target.value;
-    setCategoryID(selectedCategoryID);
-    setCategoryChildID('');
-
-    try {
-      const childrenRef = collection(db, "categories", selectedCategoryID, "children");
-      const childrenSnapshot = await getDocs(childrenRef);
-      const childrenData = childrenSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setCategoryChildren(childrenData);
-    } catch (error) {
-      console.error("Error fetching category children: ", error);
-    }
+  const fetchCategories = async () => {
+    const categorySnapshot = await getDocs(collection(db, 'categories'));
+    const categoriesList = categorySnapshot.docs.map(doc => doc.id);
+    setCategories(categoriesList);
   };
 
-  const handleCategoryChildChange = (e) => {
-    const selectedCategoryChildID = e.target.value;
-    setCategoryChildID(selectedCategoryChildID);
+  const fetchSubcategories = async (category) => {
+    if (!category) return;
+    const categoryRef = doc(db, 'categories', category);
+    const categoryDoc = await getDoc(categoryRef);
+    const subcategoriesList = categoryDoc.exists() ? categoryDoc.data().subcategories : [];
+    setSubcategories(subcategoriesList);
   };
 
-  const handleNoBarcodeItemsChange = (e) => {
-    setNoBarcodeItems(e.target.checked);
+  const handleCategoryChange = (e) => {
+    const selectedCategory = e.target.value;
+    setCategory(selectedCategory);
+    fetchSubcategories(selectedCategory);
+  };
+
+  const handleBulkPricingChange = (index, field, value) => {
+    const updatedBulkPricing = [...bulkPricing];
+    updatedBulkPricing[index][field] = value;
+    updatedBulkPricing[index].bulkPricePerUnit =
+      updatedBulkPricing[index].price && updatedBulkPricing[index].quantity
+        ? (parseFloat(updatedBulkPricing[index].price) / parseInt(updatedBulkPricing[index].quantity)).toFixed(2)
+        : '';
+    setBulkPricing(updatedBulkPricing);
+  };
+
+  const handleAddBulkPricing = () => {
+    setBulkPricing([...bulkPricing, { quantity: '', price: '', description: '', bulkPricePerUnit: '' }]);
+  };
+
+  const handleRemoveBulkPricing = (index) => {
+    const updatedBulkPricing = bulkPricing.filter((_, i) => i !== index);
+    setBulkPricing(updatedBulkPricing);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    // Find the selected subcategory name
-    const selectedSubcategory = categoryChildren.find(child => child.id === categoryChildID);
-    const subcategoryName = selectedSubcategory ? selectedSubcategory.name : '';
+    setLoading(true);
+    setError('');
 
     try {
-      const docRef = await addDoc(collection(db, 'products'), {
-        name: productName,
-        categoryID: categoryID,
-        categoryChildID: subcategoryName, // Save the subcategory name instead of ID
-        sellingPrice: parseFloat(sellingPrice),
-        quantity: parseInt(quantity),
-        wholesalePrice: parseFloat(wholesalePrice),
-        barcode: barcode,
-        NoBarcodeItems: NoBarcodeItems,
-        otherPrice: parseFloat(otherPrice),
-        otherQuantity: parseInt(otherQuantity),
-        quantitiesButton: parseInt(quantitiesButton)
-      });
+      const batch = writeBatch(db);
+      const productRef = collection(db, 'products');
+      const stockInUnits = isSoldByPiece ? parseInt(stock) : parseInt(stock) * parseInt(unitsPerCase);
 
-      console.log('Product added with ID: ', docRef.id);
+      const newProduct = {
+        name,
+        category,
+        subcategory,
+        brand,
+        unitType,
+        pricing: {
+          pricePerUnit: parseFloat(pricePerUnit),
+          bulkPricing
+        },
+        wholesalePricing: {
+          pricePerUnit: parseFloat(wholesalePricing.pricePerUnit)
+        },
+        stock: parseInt(stock),
+        unitsPerCase: isSoldByPiece ? 1 : parseInt(unitsPerCase),
+        stockInUnits,
+        imageUrl,
+        purchaseCount: 0, // Default value added here
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      };
 
-      // Reset form fields
-      setProductName('');
-      setCategoryID('');
-      setCategoryChildID('');
-      setSellingPrice('');
-      setQuantity('');
-      setWholesalePrice('');
-      setBarcode('');
-      setNoBarcodeItems(false);
-      setOtherPrice('');
-      setOtherQuantity('');
-      setQuantitiesButton('');
+      const docRef = await addDoc(productRef, newProduct);
+      batch.commit();
+
+      setLoading(false);
+      setName('');
+      setCategory('');
+      setSubcategory('');
+      setBrand('');
+      setUnitType('');
+      setPricePerUnit('');
+      setBulkPricing([{ quantity: '', price: '', description: '' }]);
+      setWholesalePricing({ pricePerUnit: '' });
+      setStock('');
+      setUnitsPerCase('');
+      setImageUrl('');
+      setIsSoldByPiece(false);
+      alert('Product added successfully!');
     } catch (error) {
-      console.error('Error adding product: ', error);
+      setLoading(false);
+      setError('Error adding product');
+      console.error(error);
     }
   };
 
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h2 className="text-2xl font-bold mb-4">Add Product</h2>
-      <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4 max-w-md mx-auto bg-white p-4">
-        <div className="mb-4">
-          <label htmlFor="productName" className="block text-gray-700 font-bold mb-2">Product Name:</label>
+    <div className="w-auto min-h-max p-4    ">
+     
+      {error && <p className="text-red-500 mb-4">{error}</p>}
+      <form className="w-full max-w-4xl  bg-white shadow-lg rounded-lg p-8 space-y-6" onSubmit={handleSubmit}>
+  <h2 className="text-xl font-bold text-gray-800">Add New Product</h2>
+  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mx-auto">
+    {/* Left Section */}
+    <div className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Product Name</label>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+          className="mt-1 p-3 w-full border border-gray-300 rounded-lg focus:ring focus:ring-blue-300 focus:outline-none"
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Category</label>
+        <select
+          value={category}
+          onChange={handleCategoryChange}
+          required
+          className="mt-1 p-3 w-full border border-gray-300 rounded-lg focus:ring focus:ring-blue-300 focus:outline-none"
+        >
+          <option value="">Select Category</option>
+          {categories.map((cat) => (
+            <option key={cat} value={cat}>{cat}</option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Subcategory</label>
+        <select
+          value={subcategory}
+          onChange={(e) => setSubcategory(e.target.value)}
+          required
+          className="mt-1 p-3 w-full border border-gray-300 rounded-lg focus:ring focus:ring-blue-300 focus:outline-none"
+          disabled={!category}
+        >
+          <option value="">Select Subcategory</option>
+          {subcategories.map((sub) => (
+            <option key={sub} value={sub}>{sub}</option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Brand</label>
+        <input
+          type="text"
+          value={brand}
+          onChange={(e) => setBrand(e.target.value)}
+          required
+          className="mt-1 p-3 w-full border border-gray-300 rounded-lg focus:ring focus:ring-blue-300 focus:outline-none"
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Unit Type</label>
+        <input
+          type="text"
+          value={unitType}
+          onChange={(e) => setUnitType(e.target.value)}
+          required
+          className="mt-1 p-3 w-full border border-gray-300 rounded-lg focus:ring focus:ring-blue-300 focus:outline-none"
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Price Per Unit</label>
+        <input
+          type="number"
+          value={pricePerUnit}
+          onChange={(e) => setPricePerUnit(e.target.value)}
+          required
+          className="mt-1 p-3 w-full border border-gray-300 rounded-lg focus:ring focus:ring-blue-300 focus:outline-none"
+        />
+      </div>
+    </div>
+
+    {/* Right Section */}
+    <div className="space-y-4  ">
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Bulk Pricing</label>
+        {bulkPricing.map((bulk, index) => (
+          <div key={index} className="space-y-2">
+            <div className="flex flex-col space-y-2">
+
+             <div className='flex space-x-2'>
+             <input
+                type="number"
+                placeholder="Quantity"
+                value={bulk.quantity}
+                onChange={(e) => handleBulkPricingChange(index, 'quantity', e.target.value)}
+                className="p-3 border border-gray-300 rounded-lg focus:ring focus:ring-blue-300 focus:outline-none"
+              />
+              <input
+                type="number"
+                placeholder="Price"
+                value={bulk.price}
+                onChange={(e) => handleBulkPricingChange(index, 'price', e.target.value)}
+                className="p-3 border border-gray-300 rounded-lg focus:ring focus:ring-blue-300 focus:outline-none"
+              />
+              </div>
+
+            {/* 2nd */}
+          <div className='flex space-x-2'>
           <input
-            type="text"
-            id="productName"
-            value={productName}
-            onChange={(e) => setProductName(e.target.value)}
-            className="border border-gray-400 rounded-md px-4 py-2 w-full focus:outline-none focus:border-blue-500"
-            required
-          />
-        </div>
-        <div className="mb-4">
-          <label htmlFor="category" className="block text-gray-700 font-bold mb-2">Category:</label>
-          <select
-            id="category"
-            value={categoryID}
-            onChange={handleCategoryChange}
-            className="border border-gray-400 rounded-md px-4 py-2 w-full focus:outline-none focus:border-blue-500"
-            required
-          >
-            <option value="">Select Category</option>
-            {categories.map(category => (
-              <option key={category.id} value={category.id}>{category.name}</option>
-            ))}
-          </select>
-        </div>
-        <div className="mb-4">
-          <label htmlFor="categoryChild" className="block text-gray-700 font-bold mb-2">Sub Categories:</label>
-          <select
-            id="categoryChild"
-            value={categoryChildID}
-            onChange={handleCategoryChildChange}
-            className="border border-gray-400 rounded-md px-4 py-2 w-full focus:outline-none focus:border-blue-500"
-            required
-          >
-            <option value="">Select SubCategories</option>
-            {categoryChildren.map(child => (
-              <option key={child.id} value={child.id}>{child.name}</option>
-            ))}
-          </select>
-        </div>
-        <div className="mb-4">
-          <label htmlFor="sellingPrice" className="block text-gray-700 font-bold mb-2">Selling Price:</label>
+                type="text"
+                placeholder="Description"
+                value={bulk.description}
+                onChange={(e) => handleBulkPricingChange(index, 'description', e.target.value)}
+                className="p-3 border border-gray-300 rounded-lg focus:ring focus:ring-blue-300 focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => handleRemoveBulkPricing(index)}
+               className="bg-red-500 text-white py-2 px-4 rounded-lg mt-2 focus:ring focus:ring-red-300 focus:outline-none"
+              >
+               Remove
+              </button>
+              <button
+          type="button"
+          onClick={handleAddBulkPricing}
+          className="bg-blue-500 text-white py-2 px-4 rounded-lg mt-2 focus:ring focus:ring-blue-300 focus:outline-none"
+        >
+          AddMore
+        </button>
+            </div>
+            </div>
+          </div>
+        ))}
+        
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Wholesale Pricing</label>
+        <div className="flex space-x-2">
           <input
             type="number"
-            id="sellingPrice"
-            value={sellingPrice}
-            onChange={(e) => setSellingPrice(e.target.value)}
-            className="border border-gray-400 rounded-md px-4 py-2 w-full focus:outline-none focus:border-blue-500"
-            required
+            placeholder="Price Per Unit"
+            value={wholesalePricing.pricePerUnit}
+            onChange={(e) => setWholesalePricing({ ...wholesalePricing, pricePerUnit: e.target.value })}
+            className="p-3 border border-gray-300 rounded-lg focus:ring focus:ring-blue-300 focus:outline-none"
           />
         </div>
-        <div className="mb-4">
-          <label htmlFor="quantity" className="block text-gray-700 font-bold mb-2">Quantity:</label>
-          <input
-            type="number"
-            id="quantity"
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
-            className="border border-gray-400 rounded-md px-4 py-2 w-full focus:outline-none focus:border-blue-500"
-            required
-          />
-        </div>
-        <div className="mb-4">
-          <label htmlFor="wholesalePrice" className="block text-gray-700 font-bold mb-2">Wholesale Price:</label>
-          <input
-            type="number"
-            id="wholesalePrice"
-            value={wholesalePrice}
-            onChange={(e) => setWholesalePrice(e.target.value)}
-            className="border border-gray-400 rounded-md px-4 py-2 w-full focus:outline-none focus:border-blue-500"
-            required
-          />
-        </div>
-        <div className="mb-4">
-          <label htmlFor="barcode" className="block text-gray-700 font-bold mb-2">Barcode:</label>
-          <input
-            type="text"
-            id="barcode"
-            value={barcode}
-            onChange={(e) => setBarcode(e.target.value)}
-            className="border border-gray-400 rounded-md px-4 py-2 w-full focus:outline-none focus:border-blue-500"
-          />
-        </div>
-        <div className="mb-4">
-          <label htmlFor="otherPrice" className="block text-gray-700 font-bold mb-2">Other Price:</label>
-          <input
-            type="number"
-            id="otherPrice"
-            value={otherPrice}
-            onChange={(e) => setOtherPrice(e.target.value)}
-            className="border border-gray-400 rounded-md px-4 py-2 w-full focus:outline-none focus:border-blue-500"
-          />
-        </div>
-        <div className="mb-4">
-          <label htmlFor="otherQuantity" className="block text-gray-700 font-bold mb-2">Other Quantity:</label>
-          <input
-            type="number"
-            id="otherQuantity"
-            value={otherQuantity}
-            onChange={(e) => setOtherQuantity(e.target.value)}
-            className="border border-gray-400 rounded-md px-4 py-2 w-full focus:outline-none focus:border-blue-500"
-          />
-        </div>
-        <div className="mb-4">
-          <label htmlFor="quantitiesButton" className="block text-gray-700 font-bold mb-2">Quantities Button:</label>
-          <input
-            type="number"
-            id="quantitiesButton"
-            value={quantitiesButton}
-            onChange={(e) => setQuantitiesButton(e.target.value)}
-            className="border border-gray-400 rounded-md px-4 py-2 w-full focus:outline-none focus:border-blue-500"
-          />
-        </div>
-        <div className="mb-4">
-          <label htmlFor="noBarcodeItems" className="block text-gray-700 font-bold mb-2">No Barcode Item:</label>
-          <input
-            type="checkbox"
-            id="noBarcodeItems"
-            checked={NoBarcodeItems}
-            onChange={handleNoBarcodeItemsChange}
-            className="border border-gray-400 rounded-md px-4 py-2 focus:outline-none focus:border-blue-500"
-          />
-        </div>
-        <div className="mb-4">
-          <button type="submit" className="bg-blue-500 text-white px-4 py-2 rounded-md">Add Product</button>
-        </div>
-      </form>
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Stock</label>
+        <input
+          type="number"
+          value={stock}
+          onChange={(e) => setStock(e.target.value)}
+          required
+          className="mt-1 p-3 w-full border border-gray-300 rounded-lg focus:ring focus:ring-blue-300 focus:outline-none"
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Units per Case</label>
+        <input
+          type="number"
+          value={unitsPerCase}
+          onChange={(e) => setUnitsPerCase(e.target.value)}
+          required={!isSoldByPiece}
+          className="mt-1 p-3 w-full border border-gray-300 rounded-lg focus:ring focus:ring-blue-300 focus:outline-none"
+          disabled={isSoldByPiece}
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Image URL</label>
+        <input
+          type="text"
+          value={imageUrl}
+          onChange={(e) => setImageUrl(e.target.value)}
+          className="mt-1 p-3 w-full border border-gray-300 rounded-lg focus:ring focus:ring-blue-300 focus:outline-none"
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Sold by Piece</label>
+        <input
+          type="checkbox"
+          checked={isSoldByPiece}
+          onChange={() => setIsSoldByPiece(!isSoldByPiece)}
+          className="mt-1 w-6 h-6"
+        />
+      </div>
+    </div>
+  </div>
+  <button
+    type="submit"
+    className="max-w-max bg-blue-600  mx-auto text-white p-2 rounded-lg text-lg font-semibold hover:bg-blue-700 focus:ring focus:ring-blue-300 focus:outline-none"
+  >
+    Add Product
+  </button>
+</form>
+
     </div>
   );
 };
