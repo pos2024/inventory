@@ -66,31 +66,51 @@ const UpdateProductForm = ({ product, closeModal }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    const updatedProduct = {
-      name,
-      category,
-      subcategory,
-      brand,
-      unitType,
-      pricing: { pricePerUnit: Number(pricePerUnit) },
-      wholesalePricing: { pricePerUnit: Number(wholesalePrice) },
-      stockInUnits: Number(stockInUnits),
-      unitsPerCase: Number(unitsPerCase),
-      imageUrl,
-    };
-
+  
     try {
+      // Fetch the current product data from Firestore
       const productRef = doc(db, 'products', product.id);
+      const productSnapshot = await getDoc(productRef);
+  
+      if (!productSnapshot.exists()) {
+        alert('Product does not exist!');
+        return;
+      }
+  
+      const currentData = productSnapshot.data();
+  
+      // Merge the updated fields with the existing data
+      const updatedProduct = {
+        ...currentData, // Preserve existing data
+        name,
+        category,
+        subcategory,
+        brand,
+        unitType,
+        pricing: {
+          ...currentData.pricing, // Preserve nested pricing data
+          pricePerUnit: Number(pricePerUnit),
+        },
+        wholesalePricing: {
+          ...currentData.wholesalePricing, // Preserve nested wholesalePricing data
+          pricePerUnit: Number(wholesalePrice),
+        },
+        stockInUnits: Number(stockInUnits),
+        unitsPerCase: Number(unitsPerCase),
+        imageUrl,
+      };
+  
+      // Update the Firestore document
       await updateDoc(productRef, updatedProduct);
-      if (closeModal) closeModal(); // Close the modal if closeModal is passed
+  
+      if (closeModal) closeModal(); // Close the modal if provided
       alert('Product updated successfully!');
     } catch (error) {
       console.error('Error updating product:', error);
       alert('Failed to update product');
     }
   };
-
+  
   return (
     <div className="modal-content p-6 bg-white rounded shadow-lg w-full max-w-2xl">
       <h2 className="text-2xl font-semibold text-center mb-4">Update Product</h2>

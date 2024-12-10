@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { collection, addDoc, getDocs } from 'firebase/firestore';
 import db from '../firebase'; // Importing db
+import UpddateBulkPricing from '../components/UpdateBulkPricing'
 
 const DownloadProducts = () => {
   const [file, setFile] = useState(null);
@@ -122,6 +123,7 @@ const DownloadProducts = () => {
           </div>
         </div>
       </div>
+      <UpddateBulkPricing/>
     </div>
   );
 };
