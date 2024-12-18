@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { collection, addDoc, getDocs } from 'firebase/firestore';
 import db from '../firebase'; // Importing db
 import UpddateBulkPricing from '../components/UpdateBulkPricing'
+import PrintProductList from '../components/PrintProductList'
 
 const DownloadProducts = () => {
   const [file, setFile] = useState(null);
@@ -92,7 +93,7 @@ const DownloadProducts = () => {
   };
 
   return (
-    <div className="flex justify-center items-center p-6">
+    <div className="flex justify-center items-center p-6 h-full flex-col">
       <div className="w-full max-w-md bg-white p-6 rounded-lg shadow-lg">
         <h1 className="text-2xl font-bold mb-4 text-center">Download / Upload Products Collection</h1>
 
@@ -124,6 +125,9 @@ const DownloadProducts = () => {
         </div>
       </div>
       <UpddateBulkPricing/>
+      <div>
+        <PrintProductList/>
+      </div>
     </div>
   );
 };

@@ -14,6 +14,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import AddProdCate from './pages/AddProdCate';
 import SalesReport from './pages/SalesReport';
 import ProductList from './pages/ProductList';
+import DeliverDrinks from './components/DeliverDrinks';
 
 
 
@@ -40,7 +41,8 @@ const App = () => {
         {path: '/addproduct', element:<AddProdCate/> },
 
         { path: '/backup', element: <DownloadProducts/>},
-        {path: '/productlist', element: <ProductList/>}
+        {path: '/productlist', element: <ProductList/>},
+          {path: 'delivery', element:<DeliverDrinks/> }
       
       ],
     },

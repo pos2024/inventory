@@ -1,21 +1,27 @@
 import React from 'react'
 
 const Header = () => {
+
+
+  const handleLogoutButton = () => {
+    localStorage.removeItem('user');
+    window.location.reload();  
+  };
+  
+
   return (
-    <div className='bg-[#4585e6] h-16 shadow-lg fixed top-0 right-0 z-50 w-full flex justify-between items-center px-4'>
+    <div className='bg-white h-16 shadow-lg fixed top-0 right-0 z-50 w-10/12 flex justify-between items-center px-4'>
     <div>
-      <span className="text-white">Welcome, Owner!</span>
+
     </div>
     <div>
       <button 
-        className='text-white font-semibold hover:text-gray-900 mr-4'
-      
+        className='text-black font-semibold hover:text-gray-900 mr-4'
+        onClick={handleLogoutButton} 
       >
         Logout
       </button>
-      {/* Static content */}
-      <button className="text-white font-semibold hover:text-gray-900">Settings</button>
-      {/* Add more static content here if needed */}
+    
     </div>
   </div>
   )

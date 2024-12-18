@@ -104,7 +104,7 @@ const SalesCategories = () => {
   const currentItems = filteredCategories.slice(startIndex, startIndex + itemsPerPage);
 
   return (
-    <div className="flex justify-center p-6">
+    <div className="flex justify-center p-6 h-auto">
       <div className="w-full max-w-6xl bg-gray-50 p-6 rounded-lg shadow-lg">
         <h1 className="text-3xl font-bold mb-6 text-gray-800">Sales Categories (Beverages)</h1>
 

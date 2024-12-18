@@ -105,49 +105,60 @@ const DeliverDrinks = () => {
   const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
 
   return (
-    <div className="max-w-5xl mx-auto mt-10 p-6 bg-gray-100 rounded-lg shadow-lg">
-      <h2 className="text-2xl font-semibold text-center mb-6">Deliver Beverages</h2>
-      <div className="mb-6">
+    <div className='h-screen p-6'>
+      <div className="max-w-4xl mx-auto mt-10 p-4 bg-gray-200 rounded-lg ">
+      <h2 className="text-xl font-semibold text-center mb-4">Deliver Beverages</h2>
+      <div className="mb-4">
         <input
           type="text"
           value={searchQuery}
           onChange={handleSearch}
-          className="w-full p-2 border border-gray-300 rounded"
+          className="w-full p-2 border border-gray-300 rounded text-sm"
           placeholder="Search by product name..."
         />
       </div>
-      <table className="w-full table-auto border-collapse bg-white rounded-lg shadow-sm">
-        <thead>
-          <tr className="bg-blue-500 text-white">
-            <th className="p-4 text-left">Name</th>
-            <th className="p-4 text-left">Stock</th>
-            <th className="p-4 text-left">Stock in Units</th>
-            <th className="p-4 text-center">Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {currentItems.map((product) => (
-            <tr key={product.id} className="border-t hover:bg-gray-100">
-              <td className="p-4">{product.name}</td>
-              <td className="p-4">{product.stock}</td>
-              <td className="p-4">{product.stockInUnits}</td>
-              <td className="p-4 text-center">
-                <button
-                  onClick={() => handleDeliverClick(product)}
-                  className="bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded"
-                >
-                  Deliver
-                </button>
-              </td>
+      <div className="overflow-x-auto">
+        <table className="w-full table-auto border-collapse bg-white rounded-lg shadow-sm text-sm">
+          <thead>
+            <tr className="bg-blue-500 text-white">
+              <th className="p-2 text-left">Image</th>
+              <th className="p-2 text-left">Name</th>
+              <th className="p-2 text-left">Stock</th>
+              <th className="p-2 text-left">Stock in Units</th>
+              <th className="p-2 text-center">Action</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-      <div className="flex justify-between items-center mt-4">
+          </thead>
+          <tbody>
+            {currentItems.map((product) => (
+              <tr key={product.id} className="border-t hover:bg-gray-100">
+                <td className="p-2">
+                  <img
+                    src={product.imageUrl}
+                    alt={product.name}
+                    className="w-12 h-12 object-cover rounded"
+                  />
+                </td>
+                <td className="p-2">{product.name}</td>
+                <td className="p-2">{product.stock}</td>
+                <td className="p-2">{product.stockInUnits}</td>
+                <td className="p-2 text-center">
+                  <button
+                    onClick={() => handleDeliverClick(product)}
+                    className="bg-green-500 hover:bg-green-600 text-white py-1 px-2 rounded text-sm"
+                  >
+                    Deliver
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="flex justify-between items-center mt-4 text-sm">
         <button
           disabled={currentPage === 1}
           onClick={() => setCurrentPage((prev) => prev - 1)}
-          className="bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 px-4 rounded"
+          className="bg-gray-300 hover:bg-gray-400 text-gray-800 py-1 px-2 rounded"
         >
           Previous
         </button>
@@ -157,7 +168,7 @@ const DeliverDrinks = () => {
         <button
           disabled={currentPage === totalPages}
           onClick={() => setCurrentPage((prev) => prev + 1)}
-          className="bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 px-4 rounded"
+          className="bg-gray-300 hover:bg-gray-400 text-gray-800 py-1 px-2 rounded"
         >
           Next
         </button>
@@ -165,13 +176,13 @@ const DeliverDrinks = () => {
 
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
-            <h3 className="text-xl font-semibold mb-4">Update Stock</h3>
-            <p className="text-gray-700 mb-4">
+          <div className="bg-white p-4 rounded-lg shadow-lg w-full max-w-md text-sm">
+            <h3 className="text-lg font-semibold mb-2">Update Stock</h3>
+            <p className="text-gray-700 mb-2">
               <strong>Product:</strong> {selectedProduct.name}
             </p>
-            {error && <p className="text-red-500 mb-4">{error}</p>}
-            <div className="mb-4">
+            {error && <p className="text-red-500 mb-2">{error}</p>}
+            <div className="mb-2">
               <label className="block text-sm font-medium text-gray-700">
                 Enter Case/Bundle to add:
               </label>
@@ -183,17 +194,17 @@ const DeliverDrinks = () => {
                 placeholder="Enter stock amount"
               />
             </div>
-            <div className="flex justify-end space-x-4">
+            <div className="flex justify-end space-x-2">
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 px-4 rounded"
+                className="bg-gray-300 hover:bg-gray-400 text-gray-800 py-1 px-2 rounded"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSubmit}
                 disabled={loading}
-                className={`py-2 px-4 rounded text-white ${
+                className={`py-1 px-2 rounded text-white text-sm ${
                   loading ? 'bg-gray-400' : 'bg-blue-500 hover:bg-blue-600'
                 }`}
               >
@@ -203,6 +214,7 @@ const DeliverDrinks = () => {
           </div>
         </div>
       )}
+    </div>
     </div>
   );
 };

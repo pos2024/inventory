@@ -4,14 +4,15 @@ import Header from "../components/Header";
 
 const Root = () => {
   return (
-    <div className="flex flex-col min-h-screen">
-      <Header />
-      <div className="flex bg-gray-200">
-        <MainNavigation />
-        <div className="ml-64 flex-grow p-4">
+    <div className="flex flex-col h-full"> <MainNavigation />
+    
+    
+       
+        <div className="ml-72 flex-grow p-4">  
+          <Header /> 
           <Outlet />
         </div>
-      </div>
+    
     </div>
   );
 };

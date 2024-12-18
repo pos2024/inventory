@@ -91,7 +91,7 @@ const Sales = () => {
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
   return (
-    <div className="flex justify-center p-6">
+    <div className="flex justify-center   ">
       <div className="w-full max-w-6xl bg-gray-50 p-6 rounded-lg shadow-lg">
         <h1 className="text-3xl font-bold mb-6 text-gray-800">Sales List</h1>
 
